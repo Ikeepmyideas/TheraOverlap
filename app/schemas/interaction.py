@@ -8,7 +8,7 @@ class DrugCheckRequest(BaseModel):
         ...,
         min_length=1,
         description="List of brand names or active ingredients to evaluate",
-        example=["Advil", "Nurofen"],
+        examples=[["Advil", "Ketoprofen", "Metformin"]],
     )
 
 class ResolvedDrug(BaseModel):

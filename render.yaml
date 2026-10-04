@@ -1,0 +1,29 @@
+services:
+  # Service API
+  - type: web
+    name: theraoverlap-backend
+    env: python
+    region: frankfurt
+    plan: free
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "uvicorn app.main:app --host 0.0.0.0 --port $PORT"
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
+
+  # Service Interface
+  - type: web
+    name: theraoverlap-frontend
+    env: python
+    region: frankfurt
+    plan: free
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "streamlit run frontend.py --server.port $PORT --server.address 0.0.0.0 --server.headless true"
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
+      - key: BACKEND_URL
+        fromService:
+          type: web
+          name: theraoverlap-backend
+          property: host

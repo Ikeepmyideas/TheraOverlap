@@ -38,8 +38,11 @@ async def health_check() -> dict:
 @app.get("/api/v1/classes", response_model=List[str])
 async def list_atc_classes() -> List[str]:
     """Return all official ATC drug classes available for selection."""
-    client: httpx.AsyncClient = app.state.client
-    return await get_all_atc_classes(client)
+    if getattr(app.state, "atc_classes", None):
+        return app.state.atc_classes
+    classes = await get_all_atc_classes(app.state.client)
+    app.state.atc_classes = classes
+    return classes
 
 
 @app.post("/api/v1/check", response_model=DrugCheckResponse)

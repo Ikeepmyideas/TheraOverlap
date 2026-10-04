@@ -1,6 +1,17 @@
 from typing import List
 import requests
 import streamlit as st
+import os
+
+env_backend = os.getenv("BACKEND_URL")
+if env_backend:
+    BACKEND_BASE_URL = (
+        f"https://{env_backend}"
+        if not env_backend.startswith("http")
+        else env_backend
+    )
+else:
+    BACKEND_BASE_URL = "http://localhost:8000"
 
 st.set_page_config(
     page_title="TheraOverlap UI",
