@@ -29,33 +29,37 @@ st.markdown(
 
 
 def get_classes_from_api() -> List[str]:
-    """Retrieve all official ATC classes via the backend proxy endpoint."""
+    """Retrieve official ATC classes with automated retries on Render spin-up (502/503)."""
     url = f"{BACKEND_BASE_URL}/api/v1/classes"
-    try:
-        response = requests.get(url, timeout=60.0)
-        if response.status_code == 200:
-            data = response.json()
-            if isinstance(data, list) and len(data) > 0:
-                return data
-        elif response.status_code in (502, 503, 504):
+    max_retries = 3
+
+    for attempt in range(max_retries):
+        try:
+            response = requests.get(url, timeout=60.0)
+            if response.status_code == 200:
+                data = response.json()
+                if isinstance(data, list) and len(data) > 0:
+                    return data
+            elif response.status_code in (502, 503, 504):
                 if attempt < max_retries - 1:
-                    time.sleep(5)  
+                    time.sleep(5)
                     continue
                 else:
                     st.error(
                         f"The backend is still spinning up on Render (HTTP {response.status_code}). "
                         "Please reload the page in a few moments."
                     )
-        else:
-            st.error(f"Backend HTTP {response.status_code} sur {url}")
-    except requests.exceptions.RequestException as err:
-        if attempt < max_retries - 1:
+            else:
+                st.error(f"Backend HTTP {response.status_code} on {url}")
+                break
+        except requests.exceptions.RequestException as err:
+            if attempt < max_retries - 1:
                 time.sleep(5)
                 continue
-        st.error(f"Backend connection error ({url}): {err}")
-        break
-        
- return []
+            st.error(f"Backend connection error ({url}): {err}")
+            break
+
+    return []
 
 
 @st.cache_data(ttl=3600)
