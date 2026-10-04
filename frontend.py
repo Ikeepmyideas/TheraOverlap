@@ -3,44 +3,57 @@ import requests
 import streamlit as st
 import os
 
-env_backend = os.getenv("BACKEND_URL")
-if env_backend:
-    BACKEND_BASE_URL = (
-        f"https://{env_backend}"
-        if not env_backend.startswith("http")
-        else env_backend
-    )
-else:
-    BACKEND_BASE_URL = "http://localhost:8000"
-
 st.set_page_config(
     page_title="TheraOverlap UI",
     page_icon="💊",
     layout="centered",
 )
 
+raw_backend_url = os.getenv("BACKEND_URL", "http://localhost:8000").strip()
+
+if raw_backend_url.startswith("http://") or raw_backend_url.startswith(
+    "https://"
+):
+    BACKEND_BASE_URL = raw_backend_url.rstrip("/")
+elif "onrender.com" in raw_backend_url:
+    BACKEND_BASE_URL = f"https://{raw_backend_url}".rstrip("/")
+elif raw_backend_url in ("localhost", "127.0.0.1"):
+    BACKEND_BASE_URL = f"http://{raw_backend_url}:8000"
+else:
+    BACKEND_BASE_URL = f"http://{raw_backend_url}:10000"
+
 st.title("💊 TheraOverlap — Therapeutic Control")
 st.markdown(
     "Detect pharmacological redundancies and ATC class overlaps in real time."
 )
 
-BACKEND_BASE_URL = "http://localhost:8000"
 
-
-@st.cache_data(ttl=86400)
-def fetch_all_classes() -> List[str]:
+def get_classes_from_api() -> List[str]:
     """Retrieve all official ATC classes via the backend proxy endpoint."""
+    url = f"{BACKEND_BASE_URL}/api/v1/classes"
     try:
-        response = requests.get(f"{BACKEND_BASE_URL}/api/v1/classes", timeout=15.0)
+        response = requests.get(url, timeout=60.0)
         if response.status_code == 200:
-            return response.json()
-    except requests.RequestException:
-        pass
+            data = response.json()
+            if isinstance(data, list) and len(data) > 0:
+                return data
+        else:
+            st.error(f"Backend HTTP {response.status_code} sur {url}")
+    except requests.exceptions.RequestException as err:
+        st.error(f"Erreur de connexion au backend ({url}) : {err}")
     return []
 
 
-with st.spinner("Loading official ATC classes from backend..."):
-    available_classes = fetch_all_classes()
+@st.cache_data(ttl=3600)
+def fetch_all_classes_cached() -> List[str]:
+    return get_classes_from_api()
+
+
+with st.spinner("Connecting to backend engine (waking up service)..."):
+    available_classes = fetch_all_classes_cached()
+    if not available_classes:
+        available_classes = get_classes_from_api()
+
 
 if "custom_drugs_list" not in st.session_state:
     st.session_state.custom_drugs_list = []
@@ -91,7 +104,7 @@ if st.button(" Run interaction analysis", type="primary"):
                 response = requests.post(
                     f"{BACKEND_BASE_URL}/api/v1/check",
                     json={"drugs": all_selected_items},
-                    timeout=15.0,
+                    timeout=30.0,
                 )
                 if response.status_code == 200:
                     data = response.json()
