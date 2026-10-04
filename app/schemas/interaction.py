@@ -36,3 +36,23 @@ class DrugCheckResponse(BaseModel):
     resolved_drugs: List[ResolvedDrug]
     unresolved_drugs: List[str]
     report: Dict[str, Any]
+
+class ClinicalReport(BaseModel):
+    status: str
+    total_alerts: int
+    interactions: List[Dict[str, Any]]
+    disclaimer: str = Field(
+        default=(
+            "TheraOverlap is a clinical decision support prototype designed "
+            "strictly for informational and educational purposes. It does not "
+            "constitute medical advice, does not replace the clinical judgment "
+            "of a healthcare professional, and must not serve as the sole basis "
+            "for therapeutic decisions."
+        )
+    )
+
+
+class DrugCheckResponse(BaseModel):
+    resolved_drugs: List[Dict[str, Any]]
+    unresolved_drugs: List[str]
+    report: ClinicalReport

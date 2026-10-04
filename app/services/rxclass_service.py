@@ -5,6 +5,33 @@ import httpx
 RXCLASS_BASE_URL = "https://rxnav.nlm.nih.gov/REST/rxclass/class/byRxcui.json"
 
 
+NLM_ALL_CLASSES_URL = (
+    "https://rxnav.nlm.nih.gov/REST/rxclass/allClasses.json?classType=ATC"
+)
+
+
+async def get_all_atc_classes(client: httpx.AsyncClient) -> List[str]:
+    """Fetch and return all unique ATC class names from NLM."""
+    try:
+        response = await client.get(NLM_ALL_CLASSES_URL, timeout=12.0)
+        if response.status_code != 200:
+            return []
+        data = response.json()
+        entries = (
+            data.get("rxclassMinConceptList", {}).get("rxclassMinConcept", [])
+        )
+        return sorted(
+            list(
+                {
+                    item.get("className")
+                    for item in entries
+                    if item.get("className")
+                }
+            )
+        )
+    except (httpx.RequestError, httpx.TimeoutException):
+        return []
+
 async def get_atc_classes_for_rxcui(
     rxcui: str, client: httpx.AsyncClient
 ) -> List[Dict[str, str]]:
@@ -84,8 +111,8 @@ async def detect_therapeutic_overlaps(
                     "level": "Danger",
                     "drugs_involved": unique_drugs,
                     "description": (
-                        f"Chevauchement thérapeutique détecté (Classe ATC {cid} - {cname}) : "
-                        f"cumul de plusieurs molécules de même visée pharmacologique."
+                        f"Therapeutic overlap detected (ATC Class {cid} - {cname}): "
+                        f"concomitant use of multiple drugs with identical pharmacological intent."
                     ),
                 }
             )
