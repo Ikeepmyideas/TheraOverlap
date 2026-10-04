@@ -5,11 +5,12 @@ import os
 
 env_backend = os.getenv("BACKEND_URL")
 if env_backend:
-    BACKEND_BASE_URL = (
-        f"https://{env_backend}"
-        if not env_backend.startswith("http")
-        else env_backend
-    )
+    if not env_backend.startswith("http://") and not env_backend.startswith(
+        "https://"
+    ):
+        BACKEND_BASE_URL = f"https://{env_backend}"
+    else:
+        BACKEND_BASE_URL = env_backend
 else:
     BACKEND_BASE_URL = "http://localhost:8000"
 
