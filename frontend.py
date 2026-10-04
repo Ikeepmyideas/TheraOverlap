@@ -34,7 +34,7 @@ def fetch_all_classes() -> List[str]:
         response = requests.get(f"{BACKEND_BASE_URL}/api/v1/classes", timeout=15.0)
         if response.status_code == 200:
             return response.json()
-    except requests.RequestError:
+    except requests.RequestException:
         pass
     return []
 
