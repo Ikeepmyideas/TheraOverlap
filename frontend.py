@@ -52,9 +52,10 @@ def get_classes_from_api() -> List[str]:
         if attempt < max_retries - 1:
                 time.sleep(5)
                 continue
-            st.error(f"Backend connection error ({url}): {err}")
-            break
-    return []
+        st.error(f"Backend connection error ({url}): {err}")
+        break
+        
+ return []
 
 
 @st.cache_data(ttl=3600)
