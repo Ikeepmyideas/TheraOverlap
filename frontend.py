@@ -1,18 +1,16 @@
+import os
 from typing import List
 import requests
 import streamlit as st
-import os
 
-env_backend = os.getenv("BACKEND_URL")
-if env_backend:
-    if not env_backend.startswith("http://") and not env_backend.startswith(
-        "https://"
-    ):
-        BACKEND_BASE_URL = f"https://{env_backend}"
-    else:
-        BACKEND_BASE_URL = env_backend
+raw_backend_url = os.getenv("BACKEND_URL", "http://localhost:8000").strip()
+
+if not raw_backend_url.startswith("http://") and not raw_backend_url.startswith(
+    "https://"
+):
+    BACKEND_BASE_URL = f"https://{raw_backend_url}".rstrip("/")
 else:
-    BACKEND_BASE_URL = "http://localhost:8000"
+    BACKEND_BASE_URL = raw_backend_url.rstrip("/")
 
 st.set_page_config(
     page_title="TheraOverlap UI",
@@ -25,23 +23,35 @@ st.markdown(
     "Detect pharmacological redundancies and ATC class overlaps in real time."
 )
 
-BACKEND_BASE_URL = "http://localhost:8000"
 
-
-@st.cache_data(ttl=86400)
-def fetch_all_classes() -> List[str]:
-    """Retrieve all official ATC classes via the backend proxy endpoint."""
+# 2. Récupération résiliente sans cacher les erreurs
+def get_classes_from_api() -> List[str]:
+    """Retrieve all official ATC classes via the backend proxy endpoint"""
+    url = f"{BACKEND_BASE_URL}/api/v1/classes"
     try:
-        response = requests.get(f"{BACKEND_BASE_URL}/api/v1/classes", timeout=15.0)
+        response = requests.get(url, timeout=50.0)
         if response.status_code == 200:
-            return response.json()
-    except requests.RequestException:
-        pass
+            data = response.json()
+            if isinstance(data, list) and data:
+                return data
+        else:
+            st.error(f"Backend HTTP {response.status_code} sur {url}")
+    except requests.exceptions.RequestException as err:
+        st.error(f"Erreur de connexion au backend ({url}) : {err}")
     return []
 
 
-with st.spinner("Loading official ATC classes from backend..."):
-    available_classes = fetch_all_classes()
+@st.cache_data(ttl=3600)
+def fetch_all_classes_cached() -> List[str]:
+    return get_classes_from_api()
+
+
+with st.spinner("Connecting to backend engine (this may take ~40s if waking up)..."):
+    available_classes = fetch_all_classes_cached()
+
+    if not available_classes:
+        available_classes = get_classes_from_api()
+
 
 if "custom_drugs_list" not in st.session_state:
     st.session_state.custom_drugs_list = []
@@ -92,7 +102,7 @@ if st.button(" Run interaction analysis", type="primary"):
                 response = requests.post(
                     f"{BACKEND_BASE_URL}/api/v1/check",
                     json={"drugs": all_selected_items},
-                    timeout=15.0,
+                    timeout=30.0,
                 )
                 if response.status_code == 200:
                     data = response.json()
@@ -114,12 +124,6 @@ if st.button(" Run interaction analysis", type="primary"):
                             st.warning(
                                 f"**{alert.get('level')}**: {involved}\n\n{alert.get('description')}"
                             )
-                        st.divider()
-                        st.caption(
-                            "⚖️️ **Medical Disclaimer:** This prototype is a clinical decision support tool "
-                            "intended purely for demonstration and research purposes. It does not replace "
-                            "professional medical consultation, clinical expertise, or official pharmacovigilance guidelines."
-                        )
                     else:
                         st.info(report.get("message", "No critical overlaps detected."))
 
@@ -129,6 +133,12 @@ if st.button(" Run interaction analysis", type="primary"):
                             st.caption(f"Unresolved entities: {data.get('unresolved_drugs')}")
                 else:
                     st.error(f"Backend returned HTTP {response.status_code}: {response.text}")
-                    
-            except requests.exceptions.ConnectionError:
-                st.error("Failed to reach FastAPI backend. Make sure Uvicorn is running on port 8000.")
+            except requests.exceptions.RequestException as exc:
+                st.error(f"Failed to reach FastAPI backend ({BACKEND_BASE_URL}): {exc}")
+
+st.divider()
+st.caption(
+    "⚖ **Medical Disclaimer:** This prototype is a clinical decision support tool "
+    "intended purely for demonstration and research purposes. It does not replace "
+    "professional medical consultation, clinical expertise, or official pharmacovigilance guidelines."
+)
