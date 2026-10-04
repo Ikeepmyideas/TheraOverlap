@@ -37,10 +37,23 @@ def get_classes_from_api() -> List[str]:
             data = response.json()
             if isinstance(data, list) and len(data) > 0:
                 return data
+        elif response.status_code in (502, 503, 504):
+                if attempt < max_retries - 1:
+                    time.sleep(5)  
+                    continue
+                else:
+                    st.error(
+                        f"The backend is still spinning up on Render (HTTP {response.status_code}). "
+                        "Please reload the page in a few moments."
+                    )
         else:
             st.error(f"Backend HTTP {response.status_code} sur {url}")
     except requests.exceptions.RequestException as err:
-        st.error(f"Erreur de connexion au backend ({url}) : {err}")
+        if attempt < max_retries - 1:
+                time.sleep(5)
+                continue
+            st.error(f"Backend connection error ({url}): {err}")
+            break
     return []
 
 
